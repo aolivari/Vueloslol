@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Radar BCN - Hora Corregida</title>
+    <style>
+        body { font-family: sans-serif; background: #121212; color: white; padding: 15px; margin: 0; }
+        .clock-container { text-align: center; background: #1e1e1e; padding: 15px; border-radius: 10px; margin-bottom: 20px; border: 1px solid #333; }
+        #reloj { font-size: 1.8em; color: #00e676; font-weight: bold; font-family: monospace; }
+        .card { background: #1e1e1e; border-radius: 12px; padding: 15px; margin-bottom: 15px; border-left: 5px solid #1a73e8; }
+        .status { float: right; font-weight: bold; color: #ffeb3b; text-transform: uppercase; font-size: 0.75em; border: 1px solid #ffeb3b; padding: 2px 6px; border-radius: 4px; }
+        .flight-code { font-size: 1.3em; font-weight: bold; color: #1a73e8; margin-bottom: 10px; }
+        .info { font-size: 0.95em; color: #bbb; line-height: 1.6; }
+        .delay { color: #ff5252; font-weight: bold; display: block; margin-top: 5px; }
+        .btn-refresh { width: 100%; padding: 12px; background: #1a73e8; color: white; border: none; border-radius: 8px; font-weight: bold; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+
+    <div class="clock-container">
+        <div style="font-size: 0.9em; color: #888; margin-bottom: 5px;">HORA ACTUAL EN BARCELONA</div>
+        <div id="reloj">00:00:00</div>
+    </div>
+
+    <button class="btn-refresh" onclick="buscarLlegadasBCN()">🔄 ACTUALIZAR LLEGADAS</button>
+
+    <div id="vuelos-lista">🔍 Consultando radar de El Prat...</div>
+
+<script>
+    const API_KEY = '691df784a5997fe3db5f4987d14e001b';
+    const misVuelos = ['DJ168', 'DL168', 'UA992', 'UX7701', 'UA120', 'SQ378', 'BA474', 'LH181', 'LA5852', 'LH1128', 'IB5201', 'VY1821', 'UA672'];
+
+    function moverReloj() {
+        const ahora = new Date();
+        const opciones = { timeZone: 'Europe/Madrid', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false };
+        document.getElementById('reloj').innerHTML = ahora.toLocaleTimeString('es-ES', opciones);
+        setTimeout(moverReloj, 1000);
+    }
+
+    async function buscarLlegadasBCN() {
+        const contenedor = document.getElementById('vuelos-lista');
+        contenedor.innerHTML = "⌛ Conectando con Barcelona...";
+        
+        const urlOriginal = `http://api.aviationstack.com/v1/flights?access_key=${API_KEY}&arr_iata=BCN`;
+        const urlProxy = `https://api.allorigins.win/get?url=${encodeURIComponent(urlOriginal)}`;
+
+        try {
+            const response = await fetch(urlProxy);
+            const data = await response.json();
+            const res = JSON.parse(data.contents);
+
+            if (!res.data || res.data.length === 0) {
+                contenedor.innerHTML = "No se detectan vuelos llegando ahora.";
+                return;
+            }
+
+            const encontrados = res.data.filter(v => misVuelos.includes(v.flight.iata));
+
+            if (encontrados.length > 0) {
+                contenedor.innerHTML = '';
+                encontrados.forEach(v => {
+                    
+                    // --- CORRECCIÓN CRÍTICA DE LA HORA ---
+                    // Tomamos la cadena de texto de la API (ej: "2026-03-01T12:30:00+00:00")
+                    // La dividimos para ignorar cualquier desfase (+00:00) y quedarnos con la hora "nominal".
+                    const rawDate = v.arrival.scheduled; 
+                    const fechaLimpia = rawDate.split('+')[0]; // Nos quedamos con "2026-03-01T12:30:00"
+                    
+                    const dateObj = new Date(fechaLimpia);
+                    
+                    const horaFormateada = dateObj.toLocaleTimeString('es-ES', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: false
+                    });
+
+                    const card = document.createElement('div');
+                    card.className = 'card';
+                    card.innerHTML = `
+                        <span class="status">${v.flight_status}</span>
+                        <div class="flight-code">${v.flight.iata}</div>
+                        <div class="info">
+                            <b>🛫 Origen:</b> ${v.departure.airport}<br>
+                            <b>🛬 Llegada BCN:</b> <span style="color:#00e676; font-size:1.1em;">${horaFormateada}</span>
+                            ${v.arrival.delay ? `<span class="delay">⚠️ Retraso: +${v.arrival.delay} min</span>` : ''}
+                        </div>
+                    `;
+                    contenedor.appendChild(card);
+                });
+            } else {
+                contenedor.innerHTML = `<div style="text-align:center; color:#888; padding:20px;">Tus vuelos no aparecen en el radar de llegadas de las próximas 2 horas.</div>`;
+            }
+        } catch (e) {
+            contenedor.innerHTML = "Error al obtener datos. Reintenta.";
+        }
+    }
+
+    moverReloj();
+    buscarLlegadasBCN();
+</script>
+</body>
+</html>
