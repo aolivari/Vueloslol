@@ -3,38 +3,41 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Radar BCN Pro</title>
+    <title>Radar BCN Final</title>
     <style>
         body { font-family: sans-serif; background: #121212; color: white; padding: 15px; margin: 0; }
         .clock-container { text-align: center; background: #1e1e1e; padding: 15px; border-radius: 10px; margin-bottom: 20px; border: 1px solid #333; }
         #reloj { font-size: 1.8em; color: #00e676; font-weight: bold; font-family: monospace; }
-        .card { background: #1e1e1e; border-radius: 12px; padding: 15px; margin-bottom: 15px; border-left: 5px solid #1a73e8; }
+        .card { background: #1e1e1e; border-radius: 12px; padding: 15px; margin-bottom: 15px; border-left: 5px solid #1a73e8; animation: fadeIn 0.5s; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .status { float: right; font-weight: bold; color: #ffeb3b; text-transform: uppercase; font-size: 0.75em; border: 1px solid #ffeb3b; padding: 2px 6px; border-radius: 4px; }
-        .flight-code { font-size: 1.3em; font-weight: bold; color: #1a73e8; margin-bottom: 10px; }
-        .info { font-size: 0.95em; color: #bbb; line-height: 1.6; }
-        .btn-refresh { width: 100%; padding: 15px; background: #1a73e8; color: white; border: none; border-radius: 8px; font-weight: bold; margin-bottom: 20px; font-size: 1em; }
-        #debug-log { background: #000; color: #666; font-size: 0.7em; padding: 10px; border-radius: 5px; margin-top: 20px; white-space: pre-wrap; border: 1px dashed #444; }
+        .flight-code { font-size: 1.3em; font-weight: bold; color: #1a73e8; margin-bottom: 5px; }
+        .info { font-size: 0.9em; color: #bbb; line-height: 1.4; }
+        .btn-refresh { width: 100%; padding: 15px; background: #1a73e8; color: white; border: none; border-radius: 8px; font-weight: bold; margin-bottom: 20px; }
+        #debug-log { background: #000; color: #00ff00; font-size: 0.7em; padding: 10px; border-radius: 5px; margin-top: 20px; font-family: monospace; border: 1px solid #333; height: 100px; overflow-y: scroll; }
     </style>
 </head>
 <body>
 
     <div class="clock-container">
-        <div style="font-size: 0.9em; color: #888; margin-bottom: 5px;">RADAR BCN v2.1 ✅</div>
+        <div style="font-size: 0.8em; color: #888;">RADAR BCN v2.2 ✅</div>
         <div id="reloj">00:00:00</div>
     </div>
 
-    <button class="btn-refresh" onclick="buscarLlegadasBCN()">🔄 ACTUALIZAR MONITOR</button>
+    <button class="btn-refresh" onclick="buscarLlegadasBCN()">🔄 BUSCAR MIS VUELOS</button>
 
-    <div id="vuelos-lista">⌛ Conectando...</div>
+    <div id="vuelos-lista"></div>
 
-    <div id="debug-log">Log de sistema: Esperando inicio...</div>
+    <div id="debug-log">Iniciando sistema...</div>
 
 <script>
     const API_KEY = '691df784a5997fe3db5f4987d14e001b';
     const misVuelos = ['DJ168', 'DL168', 'UA992', 'UX7701', 'UA120', 'SQ378', 'BA474', 'LH181', 'LA5852', 'LH1128', 'IB5201', 'VY1821', 'UA672'];
 
     function log(msg) {
-        document.getElementById('debug-log').innerText += "\n> " + msg;
+        const d = document.getElementById('debug-log');
+        d.innerHTML += "<br>> " + msg;
+        d.scrollTop = d.scrollHeight;
     }
 
     function moverReloj() {
@@ -44,61 +47,28 @@
     }
 
     async function buscarLlegadasBCN() {
-    const contenedor = document.getElementById('vuelos-lista');
-    log("Iniciando búsqueda individual de " + misVuelos.length + " vuelos...");
-    contenedor.innerHTML = ""; // Limpiar para ir rellenando uno a uno
+        const contenedor = document.getElementById('vuelos-lista');
+        contenedor.innerHTML = "<p style='text-align:center'>Buscando en tiempo real...</p>";
+        log("Consultando " + misVuelos.length + " vuelos...");
 
-    // Vamos a recorrer tu lista y preguntar por cada uno
-    for (const codigo de misVuelos) {
-        const urlOriginal = `http://api.aviationstack.com/v1/flights?access_key=${API_KEY}&flight_iata=${codigo}`;
-        const urlFinal = `https://api.allorigins.win/get?url=${encodeURIComponent(urlOriginal)}`;
+        // Usamos un bucle for clásico para máxima compatibilidad
+        for (let i = 0; i < misVuelos.length; i++) {
+            const codigo = misVuelos[i];
+            const urlOriginal = "http://api.aviationstack.com/v1/flights?access_key=" + API_KEY + "&flight_iata=" + codigo;
+            const urlFinal = "https://api.allorigins.win/get?url=" + encodeURIComponent(urlOriginal);
 
-        try {
-            const response = await fetch(urlFinal);
-            const data = await response.json();
-            const res = JSON.parse(data.contents);
+            try {
+                const response = await fetch(urlFinal);
+                const data = await response.json();
+                const res = JSON.parse(data.contents);
 
-            if (res.data && res.data.length > 0) {
-                // Tomamos el primer resultado encontrado para ese código
-                const v = res.data[0]; 
-                log("Encontrado: " + codigo);
+                if (res.data && res.data.length > 0) {
+                    const v = res.data[0];
+                    log("¡Encontrado! " + codigo);
+                    
+                    // Si ya existía el mensaje de "buscando", lo borramos en el primer acierto
+                    if(i === 0 || contenedor.innerHTML.includes("Buscando")) contenedor.innerHTML = "";
 
-                const rawDate = v.arrival.scheduled; 
-                const fechaLimpia = rawDate.split('+')[0]; 
-                const dateObj = new Date(fechaLimpia);
-                const horaFormateada = dateObj.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', hour12: false });
-
-                const card = document.createElement('div');
-                card.className = 'card';
-                card.innerHTML = `
-                    <span class="status">${v.flight_status}</span>
-                    <div class="flight-code">${v.flight.iata}</div>
-                    <div class="info">
-                        <b>🛫 Origen:</b> ${v.departure.airport}<br>
-                        <b>🛬 Llegada:</b> <span style="color:#00e676">${horaFormateada}</span>
-                        ${v.arrival.delay ? `<br><b style="color:#ff5252">Retraso: +${v.arrival.delay} min</b>` : ''}
-                    </div>
-                `;
-                contenedor.appendChild(card);
-            }
-        } catch (e) {
-            log("Error buscando " + codigo);
-        }
-    }
-    
-    if (contenedor.innerHTML === "") {
-        contenedor.innerHTML = "Ninguno de tus vuelos ha sido localizado todavía.";
-    }
-    log("Búsqueda finalizada.");
-}
-
-            // Filtrar vuelos
-            const encontrados = res.data.filter(v => misVuelos.includes(v.flight.iata));
-            log("Vuelos de tu lista encontrados: " + encontrados.length);
-
-            if (encontrados.length > 0) {
-                contenedor.innerHTML = '';
-                encontrados.forEach(v => {
                     const rawDate = v.arrival.scheduled; 
                     const fechaLimpia = rawDate.split('+')[0]; 
                     const dateObj = new Date(fechaLimpia);
@@ -110,23 +80,15 @@
                         <span class="status">${v.flight_status}</span>
                         <div class="flight-code">${v.flight.iata}</div>
                         <div class="info">
-                            <b>🛫 Origen:</b> ${v.departure.airport}<br>
-                            <b>🛬 Llegada:</b> <span style="color:#00e676">${horaFormateada}</span>
+                            <b>🛫 Origen:</b> ${v.departure.iata}<br>
+                            <b>🛬 Llegada:</b> <span style="color:#00e676; font-size:1.1em">${horaFormateada}</span>
+                            ${v.arrival.delay ? `<br><span style="color:#ff5252">⚠️ Retraso: +${v.arrival.delay}m</span>` : ''}
                         </div>
                     `;
                     contenedor.appendChild(card);
-                });
-            } else {
-                contenedor.innerHTML = "Tus vuelos aún no están en la ventana de llegada.";
-            }
-        } catch (e) {
-            log("ERROR: " + e.message);
-            contenedor.innerHTML = "Fallo en la conexión. Revisa el log inferior.";
-        }
-    }
-
-    moverReloj();
-    buscarLlegadasBCN();
-</script>
-</body>
-</html>
+                } else {
+                    log("Sin datos para: " + codigo);
+                }
+            } catch (e) {
+                log("
+    
