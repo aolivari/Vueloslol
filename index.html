@@ -44,25 +44,53 @@
     }
 
     async function buscarLlegadasBCN() {
-        const contenedor = document.getElementById('vuelos-lista');
-        log("Iniciando búsqueda...");
-        
-        // Usamos AllOrigins que es más compatible con GitHub Pages
-        const urlOriginal = `http://api.aviationstack.com/v1/flights?access_key=${API_KEY}&arr_iata=BCN`;
+    const contenedor = document.getElementById('vuelos-lista');
+    log("Iniciando búsqueda individual de " + misVuelos.length + " vuelos...");
+    contenedor.innerHTML = ""; // Limpiar para ir rellenando uno a uno
+
+    // Vamos a recorrer tu lista y preguntar por cada uno
+    for (const codigo de misVuelos) {
+        const urlOriginal = `http://api.aviationstack.com/v1/flights?access_key=${API_KEY}&flight_iata=${codigo}`;
         const urlFinal = `https://api.allorigins.win/get?url=${encodeURIComponent(urlOriginal)}`;
 
         try {
             const response = await fetch(urlFinal);
             const data = await response.json();
-            
-            // AllOrigins devuelve el JSON como string dentro de .contents
             const res = JSON.parse(data.contents);
-            log("API conectada. Vuelos totales recibidos: " + (res.data ? res.data.length : 0));
 
-            if (!res.data || res.data.length === 0) {
-                contenedor.innerHTML = "La API no devolvió vuelos activos ahora.";
-                return;
+            if (res.data && res.data.length > 0) {
+                // Tomamos el primer resultado encontrado para ese código
+                const v = res.data[0]; 
+                log("Encontrado: " + codigo);
+
+                const rawDate = v.arrival.scheduled; 
+                const fechaLimpia = rawDate.split('+')[0]; 
+                const dateObj = new Date(fechaLimpia);
+                const horaFormateada = dateObj.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', hour12: false });
+
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.innerHTML = `
+                    <span class="status">${v.flight_status}</span>
+                    <div class="flight-code">${v.flight.iata}</div>
+                    <div class="info">
+                        <b>🛫 Origen:</b> ${v.departure.airport}<br>
+                        <b>🛬 Llegada:</b> <span style="color:#00e676">${horaFormateada}</span>
+                        ${v.arrival.delay ? `<br><b style="color:#ff5252">Retraso: +${v.arrival.delay} min</b>` : ''}
+                    </div>
+                `;
+                contenedor.appendChild(card);
             }
+        } catch (e) {
+            log("Error buscando " + codigo);
+        }
+    }
+    
+    if (contenedor.innerHTML === "") {
+        contenedor.innerHTML = "Ninguno de tus vuelos ha sido localizado todavía.";
+    }
+    log("Búsqueda finalizada.");
+}
 
             // Filtrar vuelos
             const encontrados = res.data.filter(v => misVuelos.includes(v.flight.iata));
