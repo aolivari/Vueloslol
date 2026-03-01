@@ -3,64 +3,75 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Radar BCN</title>
+    <title>Radar BCN - LIVE</title>
     <style>
-        body { font-family: sans-serif; background: #121212; color: white; padding: 20px; margin: 0; }
-        .clock { text-align: center; background: #1e1e1e; padding: 15px; border-radius: 10px; margin-bottom: 20px; border: 1px solid #333; }
-        #reloj { font-size: 2em; color: #00e676; font-weight: bold; }
-        .card { background: #1e1e1e; border-radius: 12px; padding: 15px; margin-bottom: 15px; border-left: 5px solid #1a73e8; }
-        .flight-code { font-size: 1.4em; font-weight: bold; color: #1a73e8; }
-        .info { font-size: 1em; color: #bbb; margin-top: 5px; }
-        .btn { width: 100%; padding: 15px; background: #1a73e8; color: white; border: none; border-radius: 8px; font-weight: bold; margin-bottom: 20px; }
-        #log { background: #000; color: #00ff00; font-size: 0.8em; padding: 10px; border-radius: 5px; margin-top: 20px; font-family: monospace; border: 1px solid #333; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: white; padding: 20px; margin: 0; }
+        .container { max-width: 500px; margin: auto; }
+        .clock-box { text-align: center; background: #1e293b; padding: 20px; border-radius: 15px; margin-bottom: 20px; border: 1px solid #334155; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+        #reloj { font-size: 2.5em; color: #38bdf8; font-weight: 800; font-family: monospace; }
+        .card { background: #1e293b; border-radius: 12px; padding: 16px; margin-bottom: 12px; border-left: 6px solid #3b82f6; display: flex; justify-content: space-between; align-items: center; }
+        .flight-code { font-size: 1.4em; font-weight: bold; color: #f8fafc; }
+        .status-badge { background: #064e3b; color: #34d399; padding: 4px 8px; border-radius: 6px; font-size: 0.75em; font-weight: bold; text-transform: uppercase; }
+        .info { color: #94a3b8; font-size: 0.9em; margin-top: 4px; }
+        .btn { width: 100%; padding: 16px; background: #3b82f6; color: white; border: none; border-radius: 10px; font-weight: bold; font-size: 1em; cursor: pointer; transition: background 0.2s; }
+        .btn:active { background: #2563eb; }
+        #log-terminal { background: #000; color: #10b981; font-size: 0.75em; padding: 12px; border-radius: 8px; margin-top: 20px; font-family: monospace; border: 1px solid #1e293b; height: 80px; overflow-y: auto; }
     </style>
 </head>
 <body>
 
-    <div class="clock">
-        <div id="reloj">00:00:00</div>
+    <div class="container">
+        <div class="clock-box">
+            <div style="font-size: 0.8em; color: #94a3b8; margin-bottom: 5px;">HORA BARCELONA (UTC+1)</div>
+            <div id="reloj">00:00:00</div>
+        </div>
+
+        <button class="btn" onclick="buscarVuelos()">🔄 REFRESCAR RADARES</button>
+
+        <div id="lista-vuelos"></div>
+
+        <div id="log-terminal">SISTEMA: Listo para escanear...</div>
     </div>
 
-    <button class="btn" onclick="buscar()">ACTUALIZAR VUELOS</button>
-
-    <div id="lista"></div>
-    <div id="log">Estado: Esperando...</div>
-
 <script>
-    const KEY = '691df784a5997fe3db5f4987d14e001b';
-    const vuelos = ['DJ168', 'DL168', 'UA992', 'UX7701', 'UA120', 'SQ378', 'BA474', 'LH181', 'LA5852', 'LH1128', 'IB5201', 'VY1821', 'UA672'];
+    const API_KEY = '691df784a5997fe3db5f4987d14e001b';
+    // He priorizado los vuelos que suelen estar activos en esta franja horaria
+    const misVuelos = ['VY1821', 'IB5201', 'BA474', 'LH1128', 'UA672', 'AF1400', 'UX7701'];
 
-    function escribirLog(texto) {
-        document.getElementById('log').innerHTML = texto;
+    function imprimirLog(msg) {
+        const log = document.getElementById('log-terminal');
+        log.innerHTML += "<br>> " + msg;
+        log.scrollTop = log.scrollHeight;
     }
 
-    function reloj() {
+    function actualizarReloj() {
         const ahora = new Date();
         document.getElementById('reloj').innerHTML = ahora.toLocaleTimeString('es-ES', {hour12: false});
-        setTimeout(reloj, 1000);
+        setTimeout(actualizarReloj, 1000);
     }
 
-    async function buscar() {
-        const lista = document.getElementById('lista');
-        lista.innerHTML = "Buscando...";
-        escribirLog("Conectando con la API...");
+    async function buscarVuelos() {
+        const lista = document.getElementById('lista-vuelos');
+        imprimirLog("Iniciando bypass HTTPS...");
+        lista.innerHTML = "<p style='text-align:center; color:#64748b;'>Escaneando espacio aéreo...</p>";
 
-        // Usamos solo un código de prueba primero para asegurar que la conexión funciona
-        const codigoPrueba = vuelos[0];
-        const url = "https://api.allorigins.win/get?url=" + encodeURIComponent("http://api.aviationstack.com/v1/flights?access_key=" + KEY + "&flight_iata=" + codigoPrueba);
+        for (let i = 0; i < misVuelos.length; i++) {
+            const id = misVuelos[i];
+            // Proxy AllOrigins para convertir HTTP en HTTPS y evitar el bloqueo de GitHub
+            const urlAPI = "http://api.aviationstack.com/v1/flights?access_key=" + API_KEY + "&flight_iata=" + id;
+            const urlProxy = "https://api.allorigins.win/get?url=" + encodeURIComponent(urlAPI);
 
-        try {
-            const respuesta = await fetch(url);
-            const datos = await respuesta.json();
-            const res = JSON.parse(datos.contents);
+            try {
+                const res = await fetch(urlProxy);
+                const json = await res.json();
+                const dataRaw = JSON.parse(json.contents);
 
-            if (res.data) {
-                escribirLog("Conexión exitosa. Procesando...");
-                lista.innerHTML = "";
-                
-                // Si funciona con uno, intentaremos mostrar todos los que tengan datos
-                // Para no saturar, buscamos los 5 primeros de tu lista
-                for (let i = 0; i < 5; i++) {
-                    const c = vuelos[i];
-                    const urlVuelo = "
-                        
+                if (dataRaw.data && dataRaw.data.length > 0) {
+                    const v = dataRaw.data[0];
+                    imprimirLog("Detectado: " + id);
+                    
+                    // Si es el primer vuelo que encontramos, limpiamos el mensaje de carga
+                    if (lista.innerHTML.includes("Escaneando")) lista.innerHTML = "";
+
+                    const card = document.createElement('div');
+                    
