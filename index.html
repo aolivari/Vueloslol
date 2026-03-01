@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Radar BCN</title>
+    <title>Radar BCN Pro</title>
     <style>
         body { font-family: sans-serif; background: #121212; color: white; padding: 15px; margin: 0; }
         .clock-container { text-align: center; background: #1e1e1e; padding: 15px; border-radius: 10px; margin-bottom: 20px; border: 1px solid #333; }
@@ -12,50 +12,61 @@
         .status { float: right; font-weight: bold; color: #ffeb3b; text-transform: uppercase; font-size: 0.75em; border: 1px solid #ffeb3b; padding: 2px 6px; border-radius: 4px; }
         .flight-code { font-size: 1.3em; font-weight: bold; color: #1a73e8; margin-bottom: 10px; }
         .info { font-size: 0.95em; color: #bbb; line-height: 1.6; }
-        .delay { color: #ff5252; font-weight: bold; display: block; margin-top: 5px; }
         .btn-refresh { width: 100%; padding: 15px; background: #1a73e8; color: white; border: none; border-radius: 8px; font-weight: bold; margin-bottom: 20px; font-size: 1em; }
+        #debug-log { background: #000; color: #666; font-size: 0.7em; padding: 10px; border-radius: 5px; margin-top: 20px; white-space: pre-wrap; border: 1px dashed #444; }
     </style>
 </head>
 <body>
 
     <div class="clock-container">
-        <div style="font-size: 0.9em; color: #888; margin-bottom: 5px;">HORA BARCELONA</div>
+        <div style="font-size: 0.9em; color: #888; margin-bottom: 5px;">RADAR BCN v2.1 ✅</div>
         <div id="reloj">00:00:00</div>
     </div>
 
-    <button class="btn-refresh" onclick="buscarLlegadasBCN()">🔄 ACTUALIZAR AHORA</button>
+    <button class="btn-refresh" onclick="buscarLlegadasBCN()">🔄 ACTUALIZAR MONITOR</button>
 
-    <div id="vuelos-lista">🔍 Conectando con radar...</div>
+    <div id="vuelos-lista">⌛ Conectando...</div>
+
+    <div id="debug-log">Log de sistema: Esperando inicio...</div>
 
 <script>
     const API_KEY = '691df784a5997fe3db5f4987d14e001b';
     const misVuelos = ['DJ168', 'DL168', 'UA992', 'UX7701', 'UA120', 'SQ378', 'BA474', 'LH181', 'LA5852', 'LH1128', 'IB5201', 'VY1821', 'UA672'];
 
+    function log(msg) {
+        document.getElementById('debug-log').innerText += "\n> " + msg;
+    }
+
     function moverReloj() {
         const ahora = new Date();
-        const opciones = { timeZone: 'Europe/Madrid', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false };
-        document.getElementById('reloj').innerHTML = ahora.toLocaleTimeString('es-ES', opciones);
+        document.getElementById('reloj').innerHTML = ahora.toLocaleTimeString('es-ES', { timeZone: 'Europe/Madrid', hour12: false });
         setTimeout(moverReloj, 1000);
     }
 
     async function buscarLlegadasBCN() {
         const contenedor = document.getElementById('vuelos-lista');
-        contenedor.innerHTML = "⌛ Cargando datos reales...";
+        log("Iniciando búsqueda...");
         
+        // Usamos AllOrigins que es más compatible con GitHub Pages
         const urlOriginal = `http://api.aviationstack.com/v1/flights?access_key=${API_KEY}&arr_iata=BCN`;
-        // NUEVO PROXY MÁS POTENTE
-        const urlFinal = `https://corsproxy.io/?${encodeURIComponent(urlOriginal)}`;
+        const urlFinal = `https://api.allorigins.win/get?url=${encodeURIComponent(urlOriginal)}`;
 
         try {
             const response = await fetch(urlFinal);
-            const res = await response.json();
+            const data = await response.json();
+            
+            // AllOrigins devuelve el JSON como string dentro de .contents
+            const res = JSON.parse(data.contents);
+            log("API conectada. Vuelos totales recibidos: " + (res.data ? res.data.length : 0));
 
             if (!res.data || res.data.length === 0) {
-                contenedor.innerHTML = "<div style='text-align:center;color:#888;'>No hay vuelos en el radar de llegada (ventana de 2h).</div>";
+                contenedor.innerHTML = "La API no devolvió vuelos activos ahora.";
                 return;
             }
 
+            // Filtrar vuelos
             const encontrados = res.data.filter(v => misVuelos.includes(v.flight.iata));
+            log("Vuelos de tu lista encontrados: " + encontrados.length);
 
             if (encontrados.length > 0) {
                 contenedor.innerHTML = '';
@@ -63,12 +74,7 @@
                     const rawDate = v.arrival.scheduled; 
                     const fechaLimpia = rawDate.split('+')[0]; 
                     const dateObj = new Date(fechaLimpia);
-                    
-                    const horaFormateada = dateObj.toLocaleTimeString('es-ES', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        hour12: false
-                    });
+                    const horaFormateada = dateObj.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', hour12: false });
 
                     const card = document.createElement('div');
                     card.className = 'card';
@@ -77,24 +83,22 @@
                         <div class="flight-code">${v.flight.iata}</div>
                         <div class="info">
                             <b>🛫 Origen:</b> ${v.departure.airport}<br>
-                            <b>🛬 Llegada:</b> <span style="color:#00e676; font-size:1.1em;">${horaFormateada}</span>
-                            ${v.arrival.delay ? `<span class="delay">⚠️ Retraso: +${v.arrival.delay} min</span>` : ''}
+                            <b>🛬 Llegada:</b> <span style="color:#00e676">${horaFormateada}</span>
                         </div>
                     `;
                     contenedor.appendChild(card);
                 });
             } else {
-                contenedor.innerHTML = "<div style='text-align:center;color:#888;'>Tus vuelos aún no aparecen. Reintenta en unos minutos.</div>";
+                contenedor.innerHTML = "Tus vuelos aún no están en la ventana de llegada.";
             }
         } catch (e) {
-            contenedor.innerHTML = "<div style='color:#ff5252; text-align:center;'>Error de conexión. Prueba a refrescar la página.</div>";
+            log("ERROR: " + e.message);
+            contenedor.innerHTML = "Fallo en la conexión. Revisa el log inferior.";
         }
     }
 
     moverReloj();
     buscarLlegadasBCN();
 </script>
-    <h1>Radar BCN v2.0 ✅</h1>
-    
 </body>
 </html>
