@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Radar BCN - Hora Corregida</title>
+    <title>Radar BCN</title>
     <style>
         body { font-family: sans-serif; background: #121212; color: white; padding: 15px; margin: 0; }
         .clock-container { text-align: center; background: #1e1e1e; padding: 15px; border-radius: 10px; margin-bottom: 20px; border: 1px solid #333; }
@@ -13,19 +13,19 @@
         .flight-code { font-size: 1.3em; font-weight: bold; color: #1a73e8; margin-bottom: 10px; }
         .info { font-size: 0.95em; color: #bbb; line-height: 1.6; }
         .delay { color: #ff5252; font-weight: bold; display: block; margin-top: 5px; }
-        .btn-refresh { width: 100%; padding: 12px; background: #1a73e8; color: white; border: none; border-radius: 8px; font-weight: bold; margin-bottom: 20px; }
+        .btn-refresh { width: 100%; padding: 15px; background: #1a73e8; color: white; border: none; border-radius: 8px; font-weight: bold; margin-bottom: 20px; font-size: 1em; }
     </style>
 </head>
 <body>
 
     <div class="clock-container">
-        <div style="font-size: 0.9em; color: #888; margin-bottom: 5px;">HORA ACTUAL EN BARCELONA</div>
+        <div style="font-size: 0.9em; color: #888; margin-bottom: 5px;">HORA BARCELONA</div>
         <div id="reloj">00:00:00</div>
     </div>
 
-    <button class="btn-refresh" onclick="buscarLlegadasBCN()">🔄 ACTUALIZAR LLEGADAS</button>
+    <button class="btn-refresh" onclick="buscarLlegadasBCN()">🔄 ACTUALIZAR AHORA</button>
 
-    <div id="vuelos-lista">🔍 Consultando radar de El Prat...</div>
+    <div id="vuelos-lista">🔍 Conectando con radar...</div>
 
 <script>
     const API_KEY = '691df784a5997fe3db5f4987d14e001b';
@@ -40,18 +40,18 @@
 
     async function buscarLlegadasBCN() {
         const contenedor = document.getElementById('vuelos-lista');
-        contenedor.innerHTML = "⌛ Conectando con Barcelona...";
+        contenedor.innerHTML = "⌛ Cargando datos reales...";
         
         const urlOriginal = `http://api.aviationstack.com/v1/flights?access_key=${API_KEY}&arr_iata=BCN`;
-        const urlProxy = `https://api.allorigins.win/get?url=${encodeURIComponent(urlOriginal)}`;
+        // NUEVO PROXY MÁS POTENTE
+        const urlFinal = `https://corsproxy.io/?${encodeURIComponent(urlOriginal)}`;
 
         try {
-            const response = await fetch(urlProxy);
-            const data = await response.json();
-            const res = JSON.parse(data.contents);
+            const response = await fetch(urlFinal);
+            const res = await response.json();
 
             if (!res.data || res.data.length === 0) {
-                contenedor.innerHTML = "No se detectan vuelos llegando ahora.";
+                contenedor.innerHTML = "<div style='text-align:center;color:#888;'>No hay vuelos en el radar de llegada (ventana de 2h).</div>";
                 return;
             }
 
@@ -60,13 +60,8 @@
             if (encontrados.length > 0) {
                 contenedor.innerHTML = '';
                 encontrados.forEach(v => {
-                    
-                    // --- CORRECCIÓN CRÍTICA DE LA HORA ---
-                    // Tomamos la cadena de texto de la API (ej: "2026-03-01T12:30:00+00:00")
-                    // La dividimos para ignorar cualquier desfase (+00:00) y quedarnos con la hora "nominal".
                     const rawDate = v.arrival.scheduled; 
-                    const fechaLimpia = rawDate.split('+')[0]; // Nos quedamos con "2026-03-01T12:30:00"
-                    
+                    const fechaLimpia = rawDate.split('+')[0]; 
                     const dateObj = new Date(fechaLimpia);
                     
                     const horaFormateada = dateObj.toLocaleTimeString('es-ES', {
@@ -82,17 +77,17 @@
                         <div class="flight-code">${v.flight.iata}</div>
                         <div class="info">
                             <b>🛫 Origen:</b> ${v.departure.airport}<br>
-                            <b>🛬 Llegada BCN:</b> <span style="color:#00e676; font-size:1.1em;">${horaFormateada}</span>
+                            <b>🛬 Llegada:</b> <span style="color:#00e676; font-size:1.1em;">${horaFormateada}</span>
                             ${v.arrival.delay ? `<span class="delay">⚠️ Retraso: +${v.arrival.delay} min</span>` : ''}
                         </div>
                     `;
                     contenedor.appendChild(card);
                 });
             } else {
-                contenedor.innerHTML = `<div style="text-align:center; color:#888; padding:20px;">Tus vuelos no aparecen en el radar de llegadas de las próximas 2 horas.</div>`;
+                contenedor.innerHTML = "<div style='text-align:center;color:#888;'>Tus vuelos aún no aparecen. Reintenta en unos minutos.</div>";
             }
         } catch (e) {
-            contenedor.innerHTML = "Error al obtener datos. Reintenta.";
+            contenedor.innerHTML = "<div style='color:#ff5252; text-align:center;'>Error de conexión. Prueba a refrescar la página.</div>";
         }
     }
 
